@@ -1,6 +1,7 @@
 """
 Package Import
 """
+
 import yfinance as yf
 import numpy as np
 import pandas as pd
@@ -34,8 +35,8 @@ assets = [
 # Initialize Bdf and df
 Bdf = pd.DataFrame()
 for asset in assets:
-    raw = yf.download(asset, start="2012-01-01", end="2024-04-01", auto_adjust = False)
-    Bdf[asset] = raw['Adj Close']
+    raw = yf.download(asset, start="2012-01-01", end="2024-04-01", auto_adjust=False)
+    Bdf[asset] = raw["Adj Close"]
 
 df = Bdf.loc["2019-01-01":"2024-04-01"]
 
@@ -70,8 +71,37 @@ class MyPortfolio:
         """
         TODO: Complete Task 4 Below
         """
-        
-        
+
+        # Initialize: all dates, all assets (including SPY) have weight of 0
+        self.portfolio_weights = pd.DataFrame(
+            0.0, index=self.price.index, columns=self.price.columns
+        )
+
+        # --- Strategy Setup ---
+        trend_asset = "XLK"  # Only trade technology sector
+        lookback_trend = 200  # 200-day moving average ≈ 10 months
+
+        # If XLK is not in the data (theoretically won't happen), return all 0s
+        if trend_asset not in assets:
+            return
+
+        prices = self.price[trend_asset]
+
+        # Start from where we have enough lookback data
+        for i in range(lookback_trend, len(prices)):
+            date = prices.index[i]
+
+            # Calculate moving average using previous 200 days (excluding current day)
+            window = prices.iloc[i - lookback_trend : i]
+            ma = window.mean()
+            price_yesterday = prices.iloc[i - 1]
+
+            # Simple time-series momentum rule:
+            # Price above 200-day MA → hold XLK; otherwise → all cash (weight 0)
+            if price_yesterday > ma:
+                # Allocate 100% to XLK today, other sectors & SPY remain at 0
+                self.portfolio_weights.loc[date, trend_asset] = 1.0
+
         """
         TODO: Complete Task 4 Above
         """
@@ -104,7 +134,7 @@ class MyPortfolio:
 if __name__ == "__main__":
     # Import grading system (protected file in GitHub Classroom)
     from grader_2 import AssignmentJudge
-    
+
     parser = argparse.ArgumentParser(
         description="Introduction to Fintech Assignment 3 Part 12"
     )
@@ -138,6 +168,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     judge = AssignmentJudge()
-    
+
     # All grading logic is protected in grader_2.py
     judge.run_grading(args)
