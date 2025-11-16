@@ -1,6 +1,7 @@
 """
 Package Import
 """
+
 import yfinance as yf
 import numpy as np
 import pandas as pd
@@ -37,8 +38,8 @@ end = "2024-04-01"
 # Initialize df and df_returns
 df = pd.DataFrame()
 for asset in assets:
-    raw = yf.download(asset, start=start, end=end, auto_adjust = False)
-    df[asset] = raw['Adj Close']
+    raw = yf.download(asset, start=start, end=end, auto_adjust=False)
+    df[asset] = raw["Adj Close"]
 
 df_returns = df.pct_change().fillna(0)
 
@@ -62,6 +63,9 @@ class EqualWeightPortfolio:
         """
         TODO: Complete Task 1 Below
         """
+        equal_weight = 1.0 / len(assets)
+        for asset in assets:
+            self.portfolio_weights[asset] = equal_weight
 
         """
         TODO: Complete Task 1 Above
@@ -113,8 +117,12 @@ class RiskParityPortfolio:
         """
         TODO: Complete Task 2 Below
         """
-
-
+        for i in range(self.lookback + 1, len(df)):
+            R_n = df_returns.copy()[assets].iloc[i - self.lookback : i]
+            sigma = R_n.std().values
+            inv_sigma = 1.0 / sigma
+            weights = inv_sigma / np.sum(inv_sigma)
+            self.portfolio_weights.loc[df.index[i], assets] = weights
 
         """
         TODO: Complete Task 2 Above
@@ -191,7 +199,20 @@ class MeanVariancePortfolio:
                 # Sample Code: Initialize Decision w and the Objective
                 # NOTE: You can modify the following code
                 w = model.addMVar(n, name="w", ub=1)
-                model.setObjective(w.sum(), gp.GRB.MAXIMIZE)
+                model.addConstr(w.sum() == 1.0, name="budget")
+
+                # Expected return term: mu^T w
+                ret = gp.quicksum(mu[i] * w[i] for i in range(n))
+
+                # Risk term: w^T Sigma w
+                risk = gp.quicksum(
+                    Sigma[i, j] * w[i] * w[j] for i in range(n) for j in range(n)
+                )
+
+                # Objective:
+                # max  w^T mu - (gamma / 2) * w^T Sigma w
+                obj = ret - 0.5 * gamma * risk
+                model.setObjective(obj, gp.GRB.MAXIMIZE)
 
                 """
                 TODO: Complete Task 3 Above
@@ -277,6 +298,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     judge = AssignmentJudge()
-    
+
     # All grading logic is protected in grader.py
     judge.run_grading(args)
